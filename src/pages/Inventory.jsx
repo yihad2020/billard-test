@@ -1,0 +1,35 @@
+import { useEffect, useState } from 'react';
+import { get, post, put } from '../api';
+import Modal from '../components/Modal';
+import { PackagePlus } from 'lucide-react';
+const money=v=>`Bs. ${Number(v||0).toFixed(2)}`;
+export default function Inventory({user}){
+  const [products,setProducts]=useState([]);const [categories,setCategories]=useState([]);const [q,setQ]=useState('');const [selected,setSelected]=useState(null);const [newProduct,setNewProduct]=useState(false);const [message,setMessage]=useState('');
+  async function load(){try{const [p,c]=await Promise.all([get(`/products?q=${encodeURIComponent(q)}`),get('/categories')]);setProducts(p.products);setCategories(c.categories);}catch(e){setMessage(e.message);}}
+  useEffect(()=>{load();},[q]);
+  return <div className="page-stack">
+    <section className="page-intro"><div><p>Stock actual, precios y alertas. Las ventas descuentan inventario automáticamente.</p></div>{user.role==='admin'&&<button className="primary-button small" onClick={()=>setNewProduct(true)}><PackagePlus size={16}/>Nuevo producto</button>}</section>
+    <section className="panel flat"><div className="table-toolbar"><input className="input" placeholder="Buscar por nombre o SKU…" value={q} onChange={e=>setQ(e.target.value)}/><span>{products.length} productos</span></div>
+      {message&&<div className="inline-alert">{message}</div>}
+      <div className="responsive-table"><table><thead><tr><th>Producto</th><th>Categoría</th><th>Stock</th><th>Precio</th><th>Costo</th><th>Estado</th>{user.role==='admin'&&<th></th>}</tr></thead><tbody>{products.map(p=><tr key={p.id}><td><strong>{p.name}</strong><small>{p.sku||'Sin SKU'}</small></td><td>{p.category_name||'—'}</td><td><strong>{Number(p.stock)} {p.unit}</strong></td><td>{money(p.sale_price)}</td><td>{money(p.cost_price)}</td><td><span className={`stock-pill ${p.stock_status}`}>{p.stock_status==='ok'?'Disponible':p.stock_status==='low'?'Stock bajo':'Agotado'}</span></td>{user.role==='admin'&&<td><button className="text-button" onClick={()=>setSelected(p)}>Gestionar</button></td>}</tr>)}</tbody></table></div>
+    </section>
+    <ProductModal product={selected} categories={categories} onClose={()=>setSelected(null)} onSaved={async(m)=>{setMessage(m);setSelected(null);await load();}}/>
+    <NewProductModal open={newProduct} categories={categories} onClose={()=>setNewProduct(false)} onSaved={async(m)=>{setMessage(m);setNewProduct(false);await load();}}/>
+  </div>;
+}
+
+function ProductModal({product,categories,onClose,onSaved}){
+  const [form,setForm]=useState({});const [adjust,setAdjust]=useState('');const [note,setNote]=useState('Ingreso de mercadería');const [error,setError]=useState('');
+  useEffect(()=>{if(product)setForm({...product});},[product]);
+  if(!product)return null;
+  async function save(){try{await put(`/products/${product.id}`,{name:form.name,category_id:form.category_id,sale_price:Number(form.sale_price),cost_price:Number(form.cost_price),minimum_stock:Number(form.minimum_stock),unit:form.unit});onSaved('Producto actualizado.');}catch(e){setError(e.message);}}
+  async function stock(){try{await post(`/products/${product.id}/stock`,{quantity:Number(adjust),note});onSaved('Inventario actualizado.');}catch(e){setError(e.message);}}
+  return <Modal open title={product.name} subtitle={`Stock actual: ${Number(product.stock)} ${product.unit}`} onClose={onClose}><div className="form-grid two"><label>Nombre<input className="input" value={form.name||''} onChange={e=>setForm(f=>({...f,name:e.target.value}))}/></label><label>Categoría<select className="input" value={form.category_id||''} onChange={e=>setForm(f=>({...f,category_id:e.target.value}))}>{categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label><label>Precio de venta<input className="input" type="number" value={form.sale_price||0} onChange={e=>setForm(f=>({...f,sale_price:e.target.value}))}/></label><label>Costo<input className="input" type="number" value={form.cost_price||0} onChange={e=>setForm(f=>({...f,cost_price:e.target.value}))}/></label><label>Stock mínimo<input className="input" type="number" value={form.minimum_stock||0} onChange={e=>setForm(f=>({...f,minimum_stock:e.target.value}))}/></label><label>Unidad<input className="input" value={form.unit||''} onChange={e=>setForm(f=>({...f,unit:e.target.value}))}/></label></div><button className="secondary-button" onClick={save}>Guardar datos</button><div className="divider"/><h3>Ajustar inventario</h3><p className="muted">Usa un número positivo para ingresar stock y negativo para corregir una salida.</p><div className="form-grid two"><label>Cantidad<input className="input" type="number" value={adjust} onChange={e=>setAdjust(e.target.value)} placeholder="Ej. 24"/></label><label>Motivo<input className="input" value={note} onChange={e=>setNote(e.target.value)}/></label></div>{error&&<div className="inline-alert danger">{error}</div>}<button className="primary-button" onClick={stock} disabled={!adjust}>Aplicar ajuste</button></Modal>;
+}
+
+function NewProductModal({open,categories,onClose,onSaved}){
+ const [f,setF]=useState({name:'',category_id:categories[0]?.id||'',sku:'',sale_price:'',cost_price:'',stock:0,minimum_stock:5,unit:'unidad'});const [error,setError]=useState('');
+ useEffect(()=>{if(categories.length&&!f.category_id)setF(x=>({...x,category_id:categories[0].id}));},[categories]);
+ async function create(){try{await post('/products',{...f,sale_price:Number(f.sale_price),cost_price:Number(f.cost_price||0),stock:Number(f.stock||0),minimum_stock:Number(f.minimum_stock||0)});onSaved('Producto creado.');}catch(e){setError(e.message);}}
+ return <Modal open={open} title="Nuevo producto" subtitle="Alta de producto e inventario inicial" onClose={onClose}><div className="form-grid two"><label>Nombre<input className="input" value={f.name} onChange={e=>setF(x=>({...x,name:e.target.value}))}/></label><label>SKU<input className="input" value={f.sku} onChange={e=>setF(x=>({...x,sku:e.target.value}))}/></label><label>Categoría<select className="input" value={f.category_id} onChange={e=>setF(x=>({...x,category_id:e.target.value}))}>{categories.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}</select></label><label>Unidad<input className="input" value={f.unit} onChange={e=>setF(x=>({...x,unit:e.target.value}))}/></label><label>Precio de venta<input className="input" type="number" value={f.sale_price} onChange={e=>setF(x=>({...x,sale_price:e.target.value}))}/></label><label>Costo<input className="input" type="number" value={f.cost_price} onChange={e=>setF(x=>({...x,cost_price:e.target.value}))}/></label><label>Stock inicial<input className="input" type="number" value={f.stock} onChange={e=>setF(x=>({...x,stock:e.target.value}))}/></label><label>Alerta de stock<input className="input" type="number" value={f.minimum_stock} onChange={e=>setF(x=>({...x,minimum_stock:e.target.value}))}/></label></div>{error&&<div className="inline-alert danger">{error}</div>}<button className="primary-button" onClick={create}>Crear producto</button></Modal>;
+}
