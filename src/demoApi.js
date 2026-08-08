@@ -1,4 +1,4 @@
-const STATE_KEY = 'billar_control_vercel_demo_v3';
+const STATE_KEY = 'billar_control_vercel_demo_v4';
 const TOKEN_PREFIX = 'billar-demo-user-';
 const DEMO_DELAY = 90;
 
@@ -100,9 +100,17 @@ function initialState() {
     { id: 6, name: 'Mesa 6', table_type: 'billiard', billing_mode: 'hourly', hourly_rate: 30, layout_x: 69, layout_y: 61, layout_w: 13, layout_h: 9, rotation: 90, sort_order: 6, active: 1 },
     { id: 7, name: 'Mesa 7', table_type: 'billiard', billing_mode: 'hourly', hourly_rate: 30, layout_x: 84, layout_y: 58, layout_w: 14, layout_h: 10, rotation: 90, sort_order: 7, active: 1 },
     { id: 8, name: 'Mesa 8', table_type: 'billiard', billing_mode: 'hourly', hourly_rate: 30, layout_x: 84, layout_y: 12, layout_w: 13, layout_h: 9, rotation: 90, sort_order: 8, active: 1 },
-    { id: 9, name: 'Cacho 1', table_type: 'cacho', billing_mode: 'manual', hourly_rate: 0, layout_x: 5, layout_y: 7, layout_w: 9, layout_h: 9, rotation: 0, sort_order: 9, active: 1 },
-    { id: 10, name: 'Cacho 2', table_type: 'cacho', billing_mode: 'manual', hourly_rate: 0, layout_x: 13, layout_y: 7, layout_w: 9, layout_h: 9, rotation: 0, sort_order: 10, active: 1 },
-    { id: 11, name: 'Poker', table_type: 'poker', billing_mode: 'manual', hourly_rate: 0, layout_x: 6, layout_y: 68, layout_w: 18, layout_h: 12, rotation: 0, sort_order: 11, active: 1 },
+    { id: 12, name: 'Isla 1', table_type: 'island', billing_mode: 'manual', hourly_rate: 0, associated_table_id: 1, layout_x: 15, layout_y: 30, layout_w: 6, layout_h: 7, rotation: 0, sort_order: 12, active: 1 },
+    { id: 13, name: 'Isla 2', table_type: 'island', billing_mode: 'manual', hourly_rate: 0, associated_table_id: 2, layout_x: 18, layout_y: 14, layout_w: 6, layout_h: 7, rotation: 0, sort_order: 13, active: 1 },
+    { id: 14, name: 'Isla 3', table_type: 'island', billing_mode: 'manual', hourly_rate: 0, associated_table_id: 3, layout_x: 43, layout_y: 27, layout_w: 6, layout_h: 7, rotation: 0, sort_order: 14, active: 1 },
+    { id: 15, name: 'Isla 4', table_type: 'island', billing_mode: 'manual', hourly_rate: 0, associated_table_id: 4, layout_x: 36, layout_y: 52, layout_w: 6, layout_h: 7, rotation: 0, sort_order: 15, active: 1 },
+    { id: 16, name: 'Isla 5', table_type: 'island', billing_mode: 'manual', hourly_rate: 0, associated_table_id: 5, layout_x: 62, layout_y: 28, layout_w: 6, layout_h: 7, rotation: 0, sort_order: 16, active: 1 },
+    { id: 17, name: 'Isla 6', table_type: 'island', billing_mode: 'manual', hourly_rate: 0, associated_table_id: 6, layout_x: 61, layout_y: 70, layout_w: 6, layout_h: 7, rotation: 0, sort_order: 17, active: 1 },
+    { id: 18, name: 'Isla 7', table_type: 'island', billing_mode: 'manual', hourly_rate: 0, associated_table_id: 7, layout_x: 85, layout_y: 73, layout_w: 6, layout_h: 7, rotation: 0, sort_order: 18, active: 1 },
+    { id: 19, name: 'Isla 8', table_type: 'island', billing_mode: 'manual', hourly_rate: 0, associated_table_id: 8, layout_x: 84, layout_y: 31, layout_w: 6, layout_h: 7, rotation: 0, sort_order: 19, active: 1 },
+    { id: 9, name: 'Cacho 1', table_type: 'cacho', billing_mode: 'manual', hourly_rate: 0, layout_x: 5, layout_y: 7, layout_w: 9, layout_h: 9, rotation: 0, sort_order: 20, active: 1 },
+    { id: 10, name: 'Cacho 2', table_type: 'cacho', billing_mode: 'manual', hourly_rate: 0, layout_x: 13, layout_y: 7, layout_w: 9, layout_h: 9, rotation: 0, sort_order: 21, active: 1 },
+    { id: 11, name: 'Poker', table_type: 'poker', billing_mode: 'manual', hourly_rate: 0, layout_x: 6, layout_y: 68, layout_w: 18, layout_h: 12, rotation: 0, sort_order: 22, active: 1 },
   ];
 
   const tableSessions = [
@@ -138,7 +146,7 @@ function initialState() {
       opened_by: 1,
       opened_at: sqlDate(ago({ minutes: 32 })),
       hourly_rate_snapshot: 0,
-      manual_game_charge: 25,
+      manual_game_charge: 0,
       status: 'open',
       items: [{ id: 5, product_id: 5, added_by: 1, quantity: 2, unit_price: 8, line_total: 16 }],
     },
@@ -232,7 +240,7 @@ function initialState() {
   }));
 
   return {
-    version: 3,
+    version: 4,
     users,
     categories,
     products,
@@ -262,7 +270,7 @@ function loadState() {
     const raw = localStorage.getItem(STATE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed?.version === 3) return parsed;
+      if (parsed?.version === 4) return parsed;
     }
   } catch {}
   const fresh = initialState();
@@ -333,6 +341,7 @@ function sessionProductsTotal(session) {
 
 function sessionView(state, session) {
   const table = state.tables.find(item => item.id === session.game_table_id);
+  const sourceTable = session.source_table_id ? state.tables.find(item => item.id === session.source_table_id) : null;
   const user = state.users.find(item => item.id === session.opened_by);
   const items = (session.items || []).map(item => {
     const product = state.products.find(p => p.id === item.product_id);
@@ -349,6 +358,10 @@ function sessionView(state, session) {
     table_name: table?.name,
     table_type: table?.table_type,
     billing_mode: table?.billing_mode,
+    associated_table_id: table?.associated_table_id || null,
+    source_table_id: session.source_table_id || null,
+    source_table_name: sourceTable?.name || null,
+    transferred_to_island_at: session.transferred_to_island_at || null,
     opened_by_name: user?.name,
     items,
     products_total: productsTotal,
@@ -465,8 +478,12 @@ function dashboard(state, user) {
       products_total: money(sales.reduce((sum, item) => sum + n(item.products_total), 0)),
       game_total: money(sales.reduce((sum, item) => sum + n(item.game_total), 0)),
       sales_count: sales.length,
-      occupied_tables: state.tableSessions.filter(item => item.status === 'open').length,
-      active_tables: state.tables.filter(item => Number(item.active)).length,
+      occupied_tables: state.tableSessions.filter(item => {
+        if (item.status !== 'open') return false;
+        const table = state.tables.find(table => table.id === item.game_table_id);
+        return table?.table_type !== 'island';
+      }).length,
+      active_tables: state.tables.filter(item => Number(item.active) && item.table_type !== 'island').length,
       low_stock: state.products.filter(item => Number(item.active) && n(item.stock) <= n(item.minimum_stock)).length,
       expenses: money(expenses),
     },
@@ -672,6 +689,34 @@ export async function demoApi(path, options = {}) {
     return successfulMutation(state, { session: sessionView(state, session) });
   }
 
+  params = match(pathname, '/table-sessions/:id/move-to-island');
+  if (method === 'POST' && params) {
+    const session = state.tableSessions.find(item => item.id === Number(params.id) && item.status === 'open');
+    if (!session) throw new DemoApiError('La sesión de mesa ya no está abierta.', 409);
+    const sourceTable = state.tables.find(item => item.id === session.game_table_id);
+    if (!sourceTable || sourceTable.table_type !== 'billiard') throw new DemoApiError('Solo una mesa de billar puede pasar su cuenta a una isla.', 409);
+    const island = state.tables.find(item => item.table_type === 'island' && Number(item.associated_table_id) === Number(sourceTable.id) && Number(item.active));
+    if (!island) throw new DemoApiError('No hay una isla asociada a esta mesa.', 404);
+    if (state.tableSessions.some(item => item.game_table_id === island.id && item.status === 'open')) {
+      throw new DemoApiError(`${island.name} ya tiene una cuenta abierta.`, 409);
+    }
+    const frozenGameCharge = liveGameCharge(session, sourceTable);
+    session.source_table_id = sourceTable.id;
+    session.game_table_id = island.id;
+    session.manual_game_charge = frozenGameCharge;
+    session.transferred_to_island_at = sqlDate();
+    addAudit(state, user.id, 'move_table_to_island', 'table_session', session.id, {
+      from: sourceTable.name,
+      to: island.name,
+      game_charge: frozenGameCharge,
+    });
+    return successfulMutation(state, {
+      message: `Tiempo de ${sourceTable.name} cerrado. La cuenta continúa en ${island.name}.`,
+      island: clone(island),
+      session: sessionView(state, session),
+    });
+  }
+
   params = match(pathname, '/table-sessions/:id/close');
   if (method === 'POST' && params) {
     const cash = requireOpenCash(state, user.id);
@@ -697,6 +742,7 @@ export async function demoApi(path, options = {}) {
       created_at: sqlDate(),
       payment_method: body.payment_method || 'cash',
       table_name: table?.name || null,
+      source_table_name: session.source_table_id ? state.tables.find(item => item.id === session.source_table_id)?.name || null : null,
       items: clone(session.items),
     };
     state.sales.push(sale);

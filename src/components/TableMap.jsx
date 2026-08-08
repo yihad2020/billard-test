@@ -15,12 +15,18 @@ function fmtDuration(seconds) {
 function TableShape({ table, editMode }) {
   const isOccupied = table.status === 'occupied';
   const shape = table.table_type;
+  const isIsland = shape === 'island';
   return (
     <div className={`table-shape table-${shape} ${isOccupied ? 'is-occupied' : 'is-free'} ${editMode ? 'is-editing' : ''}`}>
       {shape === 'billiard' && <div className="pockets"><i/><i/><i/><i/><i/><i/></div>}
+      {isIsland && <div className="island-chairs"><i/><i/><i/><i/></div>}
       <div className="table-shape-inner">
         <strong>{table.name}</strong>
-        {isOccupied ? <><span className="table-time"><Clock3 size={12}/>{fmtDuration(secondsSince(table.opened_at))}</span><span className="table-total">Bs. {Number(table.running_total || 0).toFixed(2)}</span></> : <span className="table-free-copy">Libre</span>}
+        {isOccupied ? (
+          isIsland
+            ? <><span className="island-copy">Cuenta abierta</span><span className="table-total">Bs. {Number(table.running_total || 0).toFixed(2)}</span></>
+            : <><span className="table-time"><Clock3 size={12}/>{fmtDuration(secondsSince(table.opened_at))}</span><span className="table-total">Bs. {Number(table.running_total || 0).toFixed(2)}</span></>
+        ) : <span className="table-free-copy">{isIsland ? 'Sin cuenta' : 'Libre'}</span>}
       </div>
       {editMode && <span className="drag-hint"><Grip size={13}/></span>}
     </div>
@@ -63,6 +69,7 @@ export default function TableMap({ tables, onSelect, editMode=false, onMove }) {
       <div className="floor-toolbar-note">
         <span><i className="status-dot free"/>Libre</span>
         <span><i className="status-dot busy"/>Ocupada</span>
+        <span><i className="status-dot island"/>Isla de consumo</span>
         {editMode && <span className="edit-note">Arrastra las mesas para acomodar el salón.</span>}
       </div>
       <div className="floor-plan" ref={mapRef} onPointerMove={pointerMove}>
@@ -71,13 +78,12 @@ export default function TableMap({ tables, onSelect, editMode=false, onMove }) {
         <div className="fixture door"><span>PUERTA</span></div>
         <div className="fixture wall-label cacho-label">CACHO</div>
         <div className="fixture wall-label poker-label">POKER</div>
-        <div className="fixture column col-1"/><div className="fixture column col-2"/><div className="fixture column col-3"/><div className="fixture column col-4"/>
 
         {tables.map(table => (
           <button
             key={table.id}
             data-table-id={table.id}
-            className="map-table"
+            className={`map-table ${table.table_type === 'island' ? 'map-table-island' : ''}`}
             style={{ left:`${table.layout_x}%`, top:`${table.layout_y}%`, width:`${table.layout_w}%`, height:`${table.layout_h}%`, transform:`rotate(${table.rotation || 0}deg)`, '--counter-rotation': `${-(Number(table.rotation)||0)}deg` }}
             onClick={() => !editMode && onSelect(table)}
             onPointerDown={(e)=>pointerDown(e,table)}

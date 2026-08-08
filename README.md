@@ -78,3 +78,13 @@ En la pantalla de login puedes usar **Restablecer demo** para volver al estado i
 ## Importante
 
 Esta variante no debe utilizarse como sistema de producción. No hay una base de datos central ni seguridad de servidor: el objetivo es demostrar la experiencia completa y los flujos de la aplicación. Cuando el hosting PHP vuelva a funcionar, utiliza la versión PHP + MySQL para operación real.
+
+
+## Actualización de cliente — Islas y tarifa de billar
+
+- Las mesas de billar 1–8 tienen tarifa demo de **Bs. 30 por hora**.
+- Cada mesa de billar tiene una **isla de consumo** asociada.
+- Las islas pueden abrir cuentas de consumo sin cobrar tiempo.
+- Desde una mesa de billar ocupada se puede usar **“Cortar tiempo → Isla”**. El importe de juego se congela en ese instante, la mesa de billar queda libre y la cuenta continúa en su isla con todos los consumos existentes.
+- La tarifa de cacho se mantiene configurable/manual hasta recibir el monto confirmado.
+- Esta actualización cambia el esquema de datos demo a v4, por lo que el navegador iniciará con datos demo nuevos después del despliegue.
