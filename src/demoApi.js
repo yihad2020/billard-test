@@ -1,4 +1,4 @@
-const STATE_KEY = 'billar_control_vercel_demo_v7';
+const STATE_KEY = 'billar_control_vercel_demo_v8';
 const TOKEN_PREFIX = 'billar-demo-user-';
 const DEMO_DELAY = 90;
 
@@ -288,8 +288,44 @@ function initialState() {
     created_at: sqlDate(row[4]),
   }));
 
+  const notifications = [
+    {
+      id: 1,
+      type: 'table_started',
+      title: 'Mesa 2 en juego',
+      message: 'Caja Principal inició una sesión. El tiempo está corriendo.',
+      entity_type: 'table_session',
+      entity_id: '1',
+      url: '/control',
+      created_at: sqlDate(ago({ minutes: 47 })),
+      read_by: [],
+    },
+    {
+      id: 2,
+      type: 'sale',
+      title: 'Venta registrada',
+      message: 'Venta V-000281 cobrada correctamente.',
+      entity_type: 'sale',
+      entity_id: '1',
+      url: '/reportes',
+      created_at: sqlDate(ago({ hours: 1 })),
+      read_by: [],
+    },
+    {
+      id: 3,
+      type: 'stock',
+      title: 'Stock para revisar',
+      message: 'Energizante llegó al nivel mínimo configurado.',
+      entity_type: 'product',
+      entity_id: '8',
+      url: '/inventario',
+      created_at: sqlDate(ago({ hours: 1, minutes: 35 })),
+      read_by: [1],
+    },
+  ];
+
   return {
-    version: 7,
+    version: 8,
     users,
     categories,
     products,
@@ -300,6 +336,7 @@ function initialState() {
     sales,
     inventoryMovements: [],
     auditLogs,
+    notifications,
     counters: {
       user: 4,
       product: 9,
@@ -309,6 +346,7 @@ function initialState() {
       cashMovement: 4,
       sale: sales.length + 1,
       audit: auditLogs.length + 1,
+      notification: notifications.length + 1,
       inventoryMovement: 1,
     },
   };
@@ -319,7 +357,7 @@ function loadState() {
     const raw = localStorage.getItem(STATE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed?.version === 7) return parsed;
+      if (parsed?.version === 8) return parsed;
     }
   } catch {}
   const fresh = initialState();
@@ -329,6 +367,7 @@ function loadState() {
 
 function saveState(state) {
   localStorage.setItem(STATE_KEY, JSON.stringify(state));
+  try { window.dispatchEvent(new CustomEvent('billar-demo-state-changed')); } catch {}
 }
 
 function publicUser(user) {
@@ -444,6 +483,48 @@ function tableViews(state) {
     });
 }
 
+function addNotification(state, type, title, message, entityType = null, entityId = null, url = '/control') {
+  state.notifications = Array.isArray(state.notifications) ? state.notifications : [];
+  state.counters.notification = state.counters.notification || 1;
+  state.notifications.push({
+    id: state.counters.notification++,
+    type,
+    title,
+    message,
+    entity_type: entityType,
+    entity_id: entityId == null ? null : String(entityId),
+    url,
+    created_at: sqlDate(),
+    read_by: [],
+  });
+}
+
+function notificationForAudit(state, userId, action, entityType, entityId, details = null) {
+  const userName = state.users.find(item => item.id === userId)?.name || 'Usuario';
+  const d = details || {};
+  if (action === 'open_table') {
+    addNotification(state, 'table_started', `${d.table || 'Mesa'} en juego`, `${userName} inició una sesión. El tiempo está corriendo.`, entityType, entityId, '/control');
+  } else if (action === 'close_table') {
+    addNotification(state, 'sale', 'Mesa cobrada', `${d.sale_number || 'Venta'} · Bs. ${Number(d.total || 0).toFixed(2)} · ${userName}`, entityType, entityId, '/reportes');
+  } else if (action === 'pos_sale') {
+    addNotification(state, 'sale', 'Venta directa registrada', `${d.sale_number || 'Venta'} · Bs. ${Number(d.total || 0).toFixed(2)} · ${userName}`, entityType, entityId, '/reportes');
+  } else if (action === 'remove_table_item') {
+    addNotification(state, 'security', 'Corrección de consumo', `${userName} quitó ${d.quantity || 1}× ${d.product || 'producto'}. Motivo: ${d.reason || 'sin motivo'}.`, entityType, entityId, '/auditoria');
+  } else if (action === 'transfer_table_session') {
+    addNotification(state, 'table_transfer', 'Sesión traspasada', `${userName}: ${d.from || 'Mesa'} → ${d.to || 'Mesa'}.`, entityType, entityId, '/control');
+  } else if (action === 'move_table_to_island') {
+    addNotification(state, 'table_transfer', 'Cuenta pasó a isla', `${userName}: ${d.from || 'Mesa'} → ${d.to || 'Isla'}.`, entityType, entityId, '/control');
+  } else if (action === 'adjust_stock') {
+    addNotification(state, 'stock', 'Inventario ajustado', `${userName} modificó existencias (${Number(d.quantity || 0) > 0 ? '+' : ''}${Number(d.quantity || 0)}).`, entityType, entityId, '/inventario');
+  } else if (action === 'cash_movement') {
+    const movement = d.movement_type === 'expense' ? 'Egreso' : 'Ingreso';
+    addNotification(state, 'cash', `${movement} de caja`, `${userName} registró Bs. ${Number(d.amount || 0).toFixed(2)} · ${d.concept || 'Movimiento'}.`, entityType, entityId, '/caja');
+  } else if (action === 'close_cash') {
+    const diff = Number(d.difference || 0);
+    addNotification(state, Math.abs(diff) > 0.01 ? 'security' : 'cash', 'Caja cerrada', `${userName} cerró caja${Math.abs(diff) > 0.01 ? ` con diferencia de Bs. ${diff.toFixed(2)}` : ' sin diferencia'}.`, entityType, entityId, '/caja');
+  }
+}
+
 function addAudit(state, userId, action, entityType, entityId, details = null) {
   state.auditLogs.push({
     id: state.counters.audit++,
@@ -454,6 +535,7 @@ function addAudit(state, userId, action, entityType, entityId, details = null) {
     details_json: details,
     created_at: sqlDate(),
   });
+  notificationForAudit(state, userId, action, entityType, entityId, details);
 }
 
 function saleNumber(state) {
@@ -932,6 +1014,9 @@ export async function demoApi(path, options = {}) {
     if (n(product.stock) < qty) throw new DemoApiError('No hay stock suficiente.', 409);
     const before = n(product.stock);
     product.stock = money(before - qty);
+    if (before > n(product.minimum_stock) && n(product.stock) <= n(product.minimum_stock)) {
+      addNotification(state, 'stock', 'Stock bajo', `${product.name} llegó a ${product.stock} ${product.unit || 'u.'}. Mínimo: ${product.minimum_stock}.`, 'product', product.id, '/inventario');
+    }
     const item = {
       id: state.counters.tableItem++,
       product_id: product.id,
@@ -1310,6 +1395,41 @@ export async function demoApi(path, options = {}) {
       .slice(0, 500)
       .map(item => ({ ...clone(item), user_name: state.users.find(userRow => userRow.id === item.user_id)?.name || null }));
     return { logs };
+  }
+
+  if (method === 'GET' && pathname === '/notifications') {
+    requireAdmin(state);
+    const notifications = (state.notifications || [])
+      .slice()
+      .sort((a, b) => reportTimestamp(b.created_at, 0) - reportTimestamp(a.created_at, 0))
+      .slice(0, 80)
+      .map(item => ({ ...clone(item), read: Array.isArray(item.read_by) && item.read_by.includes(user.id) }));
+    return { notifications, unread: notifications.filter(item => !item.read).length };
+  }
+
+  params = match(pathname, '/notifications/:id/read');
+  if (method === 'POST' && params) {
+    requireAdmin(state);
+    const notification = (state.notifications || []).find(item => item.id === Number(params.id));
+    if (!notification) throw new DemoApiError('Notificación no encontrada.', 404);
+    notification.read_by = Array.isArray(notification.read_by) ? notification.read_by : [];
+    if (!notification.read_by.includes(user.id)) notification.read_by.push(user.id);
+    return successfulMutation(state, { message: 'Notificación leída.' });
+  }
+
+  if (method === 'POST' && pathname === '/notifications/read-all') {
+    requireAdmin(state);
+    (state.notifications || []).forEach(notification => {
+      notification.read_by = Array.isArray(notification.read_by) ? notification.read_by : [];
+      if (!notification.read_by.includes(user.id)) notification.read_by.push(user.id);
+    });
+    return successfulMutation(state, { message: 'Notificaciones marcadas como leídas.' });
+  }
+
+  if (method === 'POST' && pathname === '/notifications/test') {
+    requireAdmin(state);
+    addNotification(state, 'test', 'Notificación de prueba', 'Las alertas del administrador están activas en este dispositivo.', 'user', user.id, '/control');
+    return successfulMutation(state, { message: 'Notificación de prueba creada.' });
   }
 
   if (method === 'GET' && pathname === '/users') {

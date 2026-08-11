@@ -1,8 +1,9 @@
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { useState } from 'react';
-import { LayoutDashboard, Armchair, ShoppingBasket, Boxes, WalletCards, BarChart3, UsersRound, LogOut, Menu, X, ShieldCheck } from 'lucide-react';
+import { LayoutDashboard, Armchair, ShoppingBasket, Boxes, WalletCards, BarChart3, UsersRound, LogOut, Menu, X, ShieldCheck, ClipboardList } from 'lucide-react';
 import { post } from '../api';
 import BrandLogo from './BrandLogo';
+import NotificationCenter from './NotificationCenter';
 
 const mainLinks = [
   ['/', 'Resumen', LayoutDashboard],
@@ -14,6 +15,7 @@ const adminLinks = [
   ['/control', 'Control', ShieldCheck],
   ['/inventario', 'Inventario', Boxes],
   ['/reportes', 'Reportes', BarChart3],
+  ['/auditoria', 'Auditoría', ClipboardList],
   ['/usuarios', 'Usuarios', UsersRound],
 ];
 
@@ -52,7 +54,7 @@ export default function Shell({ user, onLogout }) {
         <header className="topbar">
           <button className="mobile-menu" onClick={() => setOpen(true)}><Menu size={21}/></button>
           <div><span className="eyebrow">BILLAR CENTRAL</span><h1>{title}</h1></div>
-          <div className="topbar-date">{new Intl.DateTimeFormat('es-BO', { weekday:'short', day:'2-digit', month:'short' }).format(new Date())}</div>
+          <div className="topbar-actions">{user.role === 'admin' && <NotificationCenter />}<div className="topbar-date">{new Intl.DateTimeFormat('es-BO', { weekday:'short', day:'2-digit', month:'short' }).format(new Date())}</div></div>
         </header>
         <div className="page"><Outlet/></div>
       </main>

@@ -12,6 +12,7 @@ import Cash from './pages/Cash';
 import Reports from './pages/Reports';
 import Users from './pages/Users';
 import Control from './pages/Control';
+import Audit from './pages/Audit';
 
 const MIN_SPLASH_MS = 1000;
 
@@ -58,6 +59,7 @@ export default function App() {
         <Route path="caja" element={<Cash user={user} />} />
         <Route path="control" element={isAdmin ? <Control /> : <Navigate to="/" />} />
         <Route path="reportes" element={isAdmin ? <Reports /> : <Navigate to="/" />} />
+        <Route path="auditoria" element={isAdmin ? <Audit /> : <Navigate to="/" />} />
         <Route path="usuarios" element={isAdmin ? <Users /> : <Navigate to="/" />} />
       </Route>
       <Route path="*" element={<Navigate to="/" />} />

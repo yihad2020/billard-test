@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { get } from '../api';
 import InstallAppButton from '../components/InstallAppButton';
+import NotificationSettingsCard from '../components/NotificationSettingsCard';
 import { Clock3, Package, ShieldCheck, Smartphone, WalletCards } from 'lucide-react';
 
 const money = value => `Bs. ${Number(value || 0).toLocaleString('es-BO', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -176,6 +177,8 @@ export default function Control() {
           </div>
         </article>
       </section>
+
+      <NotificationSettingsCard />
 
       <section className="panel flat control-activity-panel">
         <div className="panel-head"><div><span className="eyebrow">TRAZABILIDAD</span><h3>Actividad reciente</h3></div><span className="muted">Acciones que conviene supervisar</span></div>

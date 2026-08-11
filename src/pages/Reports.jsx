@@ -872,23 +872,7 @@ export default function Reports() {
             />
           </div>
 
-          <ReportTable
-            eyebrow="AUDITORÍA"
-            title="Actividad del sistema"
-            description="Acciones sensibles realizadas por administradores y cajeros durante el período."
-            rows={audit}
-            searchFields={['user_name', 'action', 'entity_type', row => humanAction(row.action)]}
-            searchPlaceholder="Buscar usuario, acción o entidad…"
-            filters={[{ key: 'action', label: 'Acción', options: auditActionOptions }]}
-            columns={[
-              { key: 'created_at', label: 'Fecha / hora', render: row => formatDateTime(row.created_at) },
-              { key: 'user_name', label: 'Usuario', render: row => <strong>{row.user_name || 'Sistema'}</strong> },
-              { key: 'action', label: 'Acción', render: row => humanAction(row.action) },
-              { key: 'entity_type', label: 'Entidad' },
-              { key: 'entity_id', label: 'ID' },
-            ]}
-            emptyText="Sin actividad registrada en este período."
-          />
+          <div className="report-audit-link-note">La auditoría completa ahora se encuentra en la sección <strong>Auditoría</strong> del menú de administración. Las exportaciones de reportes continúan incluyendo la hoja de auditoría.</div>
         </>
       )}
     </div>
