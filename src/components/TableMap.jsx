@@ -26,7 +26,12 @@ function TableShape({ table, editMode }) {
           isIsland
             ? <><span className="island-copy">Cuenta abierta</span><span className="table-total">Bs. {Number(table.running_total || 0).toFixed(2)}</span></>
             : <><span className="table-time"><Clock3 size={12}/>{fmtDuration(secondsSince(table.opened_at))}</span><span className="table-total">Bs. {Number(table.running_total || 0).toFixed(2)}</span></>
-        ) : <span className="table-free-copy">{isIsland ? 'Sin cuenta' : 'Libre'}</span>}
+        ) : (
+          <>
+            <span className="table-free-copy">{isIsland ? 'Sin cuenta' : 'Libre'}</span>
+            {!isIsland && table.billing_mode === 'hourly' && <span className="table-rate-copy">Bs. {Number(table.hourly_rate || 0).toFixed(0)}/h</span>}
+          </>
+        )}
       </div>
       {editMode && <span className="drag-hint"><Grip size={13}/></span>}
     </div>

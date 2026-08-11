@@ -1,6 +1,6 @@
 import { Outlet, NavLink, useLocation } from 'react-router-dom';
 import { useState } from 'react';
-import { LayoutDashboard, Armchair, ShoppingBasket, Boxes, WalletCards, BarChart3, UsersRound, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Armchair, ShoppingBasket, Boxes, WalletCards, BarChart3, UsersRound, LogOut, Menu, X, ShieldCheck } from 'lucide-react';
 import { post } from '../api';
 import BrandLogo from './BrandLogo';
 
@@ -11,6 +11,7 @@ const mainLinks = [
   ['/caja', 'Caja', WalletCards],
 ];
 const adminLinks = [
+  ['/control', 'Control', ShieldCheck],
   ['/inventario', 'Inventario', Boxes],
   ['/reportes', 'Reportes', BarChart3],
   ['/usuarios', 'Usuarios', UsersRound],

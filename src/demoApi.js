@@ -1,4 +1,4 @@
-const STATE_KEY = 'billar_control_vercel_demo_v4';
+const STATE_KEY = 'billar_control_vercel_demo_v6';
 const TOKEN_PREFIX = 'billar-demo-user-';
 const DEMO_DELAY = 90;
 
@@ -108,9 +108,9 @@ function initialState() {
     { id: 17, name: 'Isla 6', table_type: 'island', billing_mode: 'manual', hourly_rate: 0, associated_table_id: 6, layout_x: 61, layout_y: 70, layout_w: 6, layout_h: 7, rotation: 0, sort_order: 17, active: 1 },
     { id: 18, name: 'Isla 7', table_type: 'island', billing_mode: 'manual', hourly_rate: 0, associated_table_id: 7, layout_x: 85, layout_y: 73, layout_w: 6, layout_h: 7, rotation: 0, sort_order: 18, active: 1 },
     { id: 19, name: 'Isla 8', table_type: 'island', billing_mode: 'manual', hourly_rate: 0, associated_table_id: 8, layout_x: 84, layout_y: 31, layout_w: 6, layout_h: 7, rotation: 0, sort_order: 19, active: 1 },
-    { id: 9, name: 'Cacho 1', table_type: 'cacho', billing_mode: 'manual', hourly_rate: 0, layout_x: 5, layout_y: 7, layout_w: 9, layout_h: 9, rotation: 0, sort_order: 20, active: 1 },
-    { id: 10, name: 'Cacho 2', table_type: 'cacho', billing_mode: 'manual', hourly_rate: 0, layout_x: 13, layout_y: 7, layout_w: 9, layout_h: 9, rotation: 0, sort_order: 21, active: 1 },
-    { id: 11, name: 'Poker', table_type: 'poker', billing_mode: 'manual', hourly_rate: 0, layout_x: 6, layout_y: 68, layout_w: 18, layout_h: 12, rotation: 0, sort_order: 22, active: 1 },
+    { id: 9, name: 'Cacho 1', table_type: 'cacho', billing_mode: 'hourly', hourly_rate: 10, layout_x: 5, layout_y: 7, layout_w: 9, layout_h: 9, rotation: 0, sort_order: 20, active: 1 },
+    { id: 10, name: 'Cacho 2', table_type: 'cacho', billing_mode: 'hourly', hourly_rate: 10, layout_x: 13, layout_y: 7, layout_w: 9, layout_h: 9, rotation: 0, sort_order: 21, active: 1 },
+    { id: 11, name: 'Poker', table_type: 'poker', billing_mode: 'hourly', hourly_rate: 20, layout_x: 6, layout_y: 68, layout_w: 18, layout_h: 12, rotation: 0, sort_order: 22, active: 1 },
   ];
 
   const tableSessions = [
@@ -145,7 +145,7 @@ function initialState() {
       game_table_id: 9,
       opened_by: 1,
       opened_at: sqlDate(ago({ minutes: 32 })),
-      hourly_rate_snapshot: 0,
+      hourly_rate_snapshot: 10,
       manual_game_charge: 0,
       status: 'open',
       items: [{ id: 5, product_id: 5, added_by: 1, quantity: 2, unit_price: 8, line_total: 16 }],
@@ -240,7 +240,7 @@ function initialState() {
   }));
 
   return {
-    version: 4,
+    version: 6,
     users,
     categories,
     products,
@@ -270,7 +270,7 @@ function loadState() {
     const raw = localStorage.getItem(STATE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed?.version === 4) return parsed;
+      if (parsed?.version === 6) return parsed;
     }
   } catch {}
   const fresh = initialState();
@@ -491,6 +491,99 @@ function dashboard(state, user) {
   };
 }
 
+
+function ownerControl(state) {
+  const liveTables = tableViews(state);
+  const openSessions = state.tableSessions
+    .filter(item => item.status === 'open')
+    .map(session => {
+      const view = sessionView(state, session);
+      const table = state.tables.find(item => item.id === session.game_table_id);
+      return {
+        ...view,
+        table_id: table?.id || null,
+        table_name: table?.name || view.table_name,
+        table_type: table?.table_type || view.table_type,
+        opened_by_name: state.users.find(item => item.id === session.opened_by)?.name || 'Cajero',
+        item_count: (session.items || []).reduce((sum, item) => sum + n(item.quantity), 0),
+      };
+    })
+    .sort((a, b) => String(a.table_name || '').localeCompare(String(b.table_name || ''), 'es'));
+
+  const openCash = state.cashSessions
+    .filter(item => item.status === 'open')
+    .map(item => {
+      const summary = cashSummary(state, item.id) || {};
+      return {
+        id: item.id,
+        user_id: item.user_id,
+        user_name: state.users.find(user => user.id === item.user_id)?.name || 'Cajero',
+        opened_at: item.opened_at,
+        opening_amount: summary.opening_amount || item.opening_amount,
+        sales_total: summary.sales_total || 0,
+        sales_count: summary.sales_count || 0,
+        cash_sales: summary.cash_sales || 0,
+        other_income: summary.other_income || 0,
+        expenses: summary.expenses || 0,
+        live_expected_amount: summary.expected_cash || 0,
+      };
+    });
+
+  const sensitiveActions = new Set([
+    'add_table_item',
+    'remove_table_item',
+    'adjust_stock',
+    'transfer_table_session',
+    'move_table_to_island',
+    'close_table',
+    'pos_sale',
+    'open_table',
+    'cash_movement',
+    'close_cash',
+    'create_product',
+    'update_product',
+  ]);
+
+  const recentActivity = state.auditLogs
+    .filter(item => sensitiveActions.has(item.action))
+    .slice()
+    .sort((a, b) => b.id - a.id)
+    .slice(0, 18)
+    .map(item => ({
+      ...clone(item),
+      user_name: state.users.find(user => user.id === item.user_id)?.name || 'Sistema',
+    }));
+
+  const lowStock = state.products
+    .filter(item => Number(item.active) && n(item.stock) <= n(item.minimum_stock))
+    .sort((a, b) => n(a.stock) - n(b.stock))
+    .map(item => ({
+      id: item.id,
+      name: item.name,
+      stock: item.stock,
+      minimum_stock: item.minimum_stock,
+      unit: item.unit,
+    }));
+
+  return {
+    generated_at: sqlDate(),
+    summary: {
+      occupied_game_tables: liveTables.filter(item => item.table_type !== 'island' && item.status === 'occupied').length,
+      active_game_tables: liveTables.filter(item => item.table_type !== 'island').length,
+      open_islands: liveTables.filter(item => item.table_type === 'island' && item.status === 'occupied').length,
+      active_accounts: openSessions.length,
+      active_products_total: money(openSessions.reduce((sum, item) => sum + n(item.products_total), 0)),
+      active_running_total: money(openSessions.reduce((sum, item) => sum + n(item.total), 0)),
+      low_stock: lowStock.length,
+      open_cash_registers: openCash.length,
+    },
+    sessions: openSessions,
+    cash_sessions: openCash,
+    low_stock: lowStock,
+    recent_activity: recentActivity,
+  };
+}
+
 function reports(state, from, to) {
   const filtered = state.sales.filter(sale => sale.status === 'completed' && dateOnly(sale.created_at) >= from && dateOnly(sale.created_at) <= to);
   const dayMap = new Map();
@@ -592,6 +685,10 @@ export async function demoApi(path, options = {}) {
     return successfulMutation(state, { message: 'Sesión cerrada.' });
   }
   if (method === 'GET' && pathname === '/dashboard') return dashboard(state, user);
+  if (method === 'GET' && pathname === '/control/live') {
+    requireAdmin(state);
+    return ownerControl(state);
+  }
 
   if (method === 'GET' && pathname === '/tables') return { tables: tableViews(state) };
 
@@ -674,7 +771,11 @@ export async function demoApi(path, options = {}) {
     const [item] = session.items.splice(index, 1);
     const product = state.products.find(p => p.id === item.product_id);
     if (product) product.stock = money(n(product.stock) + n(item.quantity));
-    addAudit(state, user.id, 'remove_table_item', 'table_session', session.id, { reason: body.reason || 'Cargado por error' });
+    addAudit(state, user.id, 'remove_table_item', 'table_session', session.id, {
+      product: product?.name || 'Producto',
+      quantity: n(item.quantity),
+      reason: String(body.reason || '').trim() || 'Sin motivo especificado',
+    });
     return successfulMutation(state, { session: sessionView(state, session) });
   }
 
@@ -687,6 +788,59 @@ export async function demoApi(path, options = {}) {
     session.manual_game_charge = Math.max(0, n(body.amount));
     addAudit(state, user.id, 'update_manual_charge', 'table_session', session.id, { amount: session.manual_game_charge });
     return successfulMutation(state, { session: sessionView(state, session) });
+  }
+
+  params = match(pathname, '/table-sessions/:id/transfer');
+  if (method === 'POST' && params) {
+    const session = state.tableSessions.find(item => item.id === Number(params.id) && item.status === 'open');
+    if (!session) throw new DemoApiError('La sesión de mesa ya no está abierta.', 409);
+
+    const sourceTable = state.tables.find(item => item.id === session.game_table_id && Number(item.active));
+    if (!sourceTable || sourceTable.table_type === 'island') {
+      throw new DemoApiError('Solo se pueden traspasar sesiones de mesas de juego.', 409);
+    }
+
+    const targetTable = state.tables.find(item => item.id === Number(body.target_table_id) && Number(item.active));
+    if (!targetTable || targetTable.table_type === 'island') {
+      throw new DemoApiError('Selecciona una mesa de destino válida.', 404);
+    }
+    if (targetTable.id === sourceTable.id) {
+      throw new DemoApiError('La mesa de destino debe ser diferente.', 409);
+    }
+    if (targetTable.table_type !== sourceTable.table_type) {
+      throw new DemoApiError('El traspaso debe hacerse a una mesa del mismo tipo de juego.', 409);
+    }
+    if (targetTable.billing_mode !== sourceTable.billing_mode) {
+      throw new DemoApiError('La mesa de destino debe usar el mismo modo de cobro.', 409);
+    }
+    if (state.tableSessions.some(item => item.game_table_id === targetTable.id && item.status === 'open')) {
+      throw new DemoApiError(`${targetTable.name} está ocupada. Selecciona otra mesa disponible.`, 409);
+    }
+
+    const fromTableId = sourceTable.id;
+    session.game_table_id = targetTable.id;
+    session.transfer_history = Array.isArray(session.transfer_history) ? session.transfer_history : [];
+    session.transfer_history.push({
+      from_table_id: fromTableId,
+      from_table_name: sourceTable.name,
+      to_table_id: targetTable.id,
+      to_table_name: targetTable.name,
+      transferred_by: user.id,
+      transferred_at: sqlDate(),
+    });
+
+    addAudit(state, user.id, 'transfer_table_session', 'table_session', session.id, {
+      from: sourceTable.name,
+      to: targetTable.name,
+      opened_at: session.opened_at,
+      hourly_rate_snapshot: session.hourly_rate_snapshot,
+    });
+
+    return successfulMutation(state, {
+      message: `Sesión traspasada de ${sourceTable.name} a ${targetTable.name}. El tiempo y los consumos continúan sin reiniciarse.`,
+      table: clone(targetTable),
+      session: sessionView(state, session),
+    });
   }
 
   params = match(pathname, '/table-sessions/:id/move-to-island');

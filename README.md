@@ -23,7 +23,8 @@ También existe un cajero adicional `maria / demo123`.
 - Plano gráfico e interactivo del salón
 - Abrir y cerrar mesas
 - Temporizador y cobro por hora
-- Cacho/Poker con cobro manual
+- Cacho 1 y Cacho 2 con temporizador a **Bs. 10/hora**
+- Poker con temporizador a **Bs. 20/hora**
 - Agregar/quitar consumos por mesa
 - Descuento automático de inventario
 - Venta rápida POS
@@ -86,5 +87,15 @@ Esta variante no debe utilizarse como sistema de producción. No hay una base de
 - Cada mesa de billar tiene una **isla de consumo** asociada.
 - Las islas pueden abrir cuentas de consumo sin cobrar tiempo.
 - Desde una mesa de billar ocupada se puede usar **“Cortar tiempo → Isla”**. El importe de juego se congela en ese instante, la mesa de billar queda libre y la cuenta continúa en su isla con todos los consumos existentes.
-- La tarifa de cacho se mantiene configurable/manual hasta recibir el monto confirmado.
+- Cacho 1 y Cacho 2 están configuradas a **Bs. 10 por hora**.
+- Poker está configurada a **Bs. 20 por hora**.
+- Las sesiones de juego pueden **traspasarse a otra mesa libre del mismo tipo** sin reiniciar el tiempo ni perder los consumos.
 - Esta actualización cambia el esquema de datos demo a v4, por lo que el navegador iniciará con datos demo nuevos después del despliegue.
+
+## Último feedback del cliente: control desde celular
+
+La versión 1.3 agrega una vista administrativa **Control** optimizada para móvil. Permite revisar cuentas abiertas, mesas/islas activas, productos cargados, cajero responsable, total en curso, cajas abiertas, stock bajo y actividad sensible.
+
+También se agregó soporte PWA para que el demo pueda instalarse desde el navegador como una app en la pantalla de inicio.
+
+> Nota de demo: el modo Vercel sigue usando `localStorage`, así que distintos dispositivos no comparten el mismo estado. En producción, la misma interfaz se conecta al backend PHP + MySQL y ahí sí permite supervisión multiusuario/multidispositivo en tiempo real.

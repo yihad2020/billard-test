@@ -1,0 +1,25 @@
+{
+  "name": "Billar Control",
+  "short_name": "Billar",
+  "description": "Sistema interno para mesas, consumos, caja e inventario.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#090b0a",
+  "theme_color": "#0d0f0e",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/assets/branding/billar-app-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/assets/branding/billar-app-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import Modal from './Modal';
 import { del, get, post, put } from '../api';
-import { Minus, Plus, Trash2 } from 'lucide-react';
+import { ArrowRightLeft, Minus, Plus, Trash2 } from 'lucide-react';
 
 function elapsed(openedAt) {
   if (!openedAt) return '00:00:00';
@@ -24,6 +24,8 @@ export default function TableSessionModal({ table, onClose, onChanged }) {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
+  const [tableOptions, setTableOptions] = useState([]);
+  const [targetTableId, setTargetTableId] = useState('');
   const [, tick] = useState(0);
 
   const open = Boolean(table);
@@ -34,6 +36,8 @@ export default function TableSessionModal({ table, onClose, onChanged }) {
     if (!open) return;
     setMessage('');
     get('/products').then(r => setProducts(r.products));
+    get('/tables').then(r => setTableOptions(r.tables || [])).catch(() => setTableOptions([]));
+    setTargetTableId('');
     if (table.session_id) loadSession(table.session_id);
     else setSession(null);
   }, [open, table?.id, table?.session_id]);
@@ -82,10 +86,16 @@ export default function TableSessionModal({ table, onClose, onChanged }) {
   }
 
   async function remove(item) {
-    if (!confirm(`Quitar ${item.product_name} y devolverlo al inventario?`)) return;
+    const reason = prompt(`Motivo para quitar ${item.product_name}. Esta corrección quedará registrada en auditoría:`);
+    if (reason === null) return;
+    if (!reason.trim()) {
+      setMessage('Debes indicar un motivo para corregir un consumo.');
+      return;
+    }
+    if (!confirm(`Quitar ${item.product_name}, devolverlo al inventario y registrar el motivo?`)) return;
     setLoading(true);
     try {
-      const r = await del(`/table-sessions/${session.id}/items/${item.id}`, { reason: 'Cargado por error' });
+      const r = await del(`/table-sessions/${session.id}/items/${item.id}`, { reason: reason.trim() });
       setSession(r.session);
       await onChanged?.();
     } catch (e) {
@@ -102,6 +112,27 @@ export default function TableSessionModal({ table, onClose, onChanged }) {
       await onChanged?.();
     } catch (e) {
       setMessage(e.message);
+    }
+  }
+
+  async function transferSession() {
+    const target = tableOptions.find(item => Number(item.id) === Number(targetTableId));
+    if (!target) {
+      setMessage('Selecciona una mesa disponible para hacer el traspaso.');
+      return;
+    }
+    if (!confirm(`¿Traspasar la sesión de ${table.name} a ${target.name}? El tiempo seguirá corriendo sin reiniciarse.`)) return;
+    setLoading(true);
+    setMessage('');
+    try {
+      const r = await post(`/table-sessions/${session.id}/transfer`, { target_table_id: target.id });
+      setMessage(r.message);
+      await onChanged?.();
+      setTimeout(onClose, 700);
+    } catch (e) {
+      setMessage(e.message);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -140,6 +171,16 @@ export default function TableSessionModal({ table, onClose, onChanged }) {
     () => products.filter(p => p.name.toLowerCase().includes(search.toLowerCase())).slice(0, 18),
     [products, search],
   );
+
+  const transferTargets = useMemo(() => {
+    if (!session || session.table_type === 'island') return [];
+    return tableOptions.filter(item =>
+      Number(item.id) !== Number(table?.id) &&
+      item.table_type === session.table_type &&
+      item.billing_mode === session.billing_mode &&
+      item.status === 'free'
+    );
+  }, [tableOptions, session?.id, session?.table_type, session?.billing_mode, table?.id]);
 
   const productTotal = session ? session.items.reduce((a, i) => a + Number(i.line_total), 0) : 0;
   let gameCharge = session ? Number(session.game_charge || 0) : 0;
@@ -221,6 +262,25 @@ export default function TableSessionModal({ table, onClose, onChanged }) {
             </div>
 
             {message && <div className="inline-alert">{message}</div>}
+
+            {!sessionIsIsland && transferTargets.length > 0 && (
+              <div className="table-transfer-action">
+                <div className="table-transfer-copy">
+                  <span className="transfer-icon"><ArrowRightLeft size={16}/></span>
+                  <div>
+                    <strong>Traspasar sesión</strong>
+                    <span>Muévela a otra mesa libre del mismo tipo sin perder el tiempo ni los consumos.</span>
+                  </div>
+                </div>
+                <div className="table-transfer-control">
+                  <select className="input" value={targetTableId} onChange={e => setTargetTableId(e.target.value)}>
+                    <option value="">Seleccionar mesa libre</option>
+                    {transferTargets.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}
+                  </select>
+                  <button className="secondary-button" disabled={loading || !targetTableId} onClick={transferSession}>Traspasar</button>
+                </div>
+              </div>
+            )}
 
             {isBilliard && (
               <div className="island-transfer-action">
