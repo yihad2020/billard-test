@@ -99,3 +99,7 @@ La versión 1.3 agrega una vista administrativa **Control** optimizada para móv
 También se agregó soporte PWA para que el demo pueda instalarse desde el navegador como una app en la pantalla de inicio.
 
 > Nota de demo: el modo Vercel sigue usando `localStorage`, así que distintos dispositivos no comparten el mismo estado. En producción, la misma interfaz se conecta al backend PHP + MySQL y ahí sí permite supervisión multiusuario/multidispositivo en tiempo real.
+
+## Reportes v2
+
+La pantalla de Reportes incluye períodos rápidos de 24 horas, 7, 30 y 90 días, último año y rango personalizado. Los reportes muestran ventas por vendedor, ventas por día, detalle de transacciones, productos, mesas, métodos de pago y auditoría. Todas las tablas incluyen buscador, filtros contextuales, selector de filas y paginación. La exportación Excel/PDF utiliza el período completo seleccionado, no solamente la página visible de la tabla.

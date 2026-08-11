@@ -1,4 +1,4 @@
-const STATE_KEY = 'billar_control_vercel_demo_v6';
+const STATE_KEY = 'billar_control_vercel_demo_v7';
 const TOKEN_PREFIX = 'billar-demo-user-';
 const DEMO_DELAY = 90;
 
@@ -181,7 +181,56 @@ function initialState() {
     { days: 6, hours: 4, cashier_id: 2, cash_session_id: 8, sale_type: 'pos', products_total: 62, game_total: 0, payment_method: 'qr', items: [[1,1],[2,1],[6,2]] },
   ];
 
-  const sales = saleSeed.map((seed, index) => {
+  // Historical demo rows make 30/90-day and annual reports meaningful in the client showcase.
+  // They are deterministic and are reset together with the rest of the browser demo data.
+  const historicalDays = [8, 12, 18, 25, 32, 45, 60, 75, 92, 120, 150, 180, 240, 300, 360];
+  const historicalSaleSeed = historicalDays.flatMap((days, index) => {
+    const cashierA = (index % 3) + 1;
+    const cashierB = ((index + 1) % 3) + 1;
+    const tableNumber = (index % 8) + 1;
+    const productA = (index % 6) + 1;
+    const productB = ((index + 2) % 6) + 1;
+    const qtyA = (index % 3) + 1;
+    const qtyB = ((index + 1) % 2) + 1;
+    const firstProducts = [[productA, qtyA], [productB, qtyB]];
+    const firstProductsTotal = firstProducts.reduce((sum, [productId, quantity]) => {
+      const product = products.find(item => item.id === productId);
+      return sum + n(product?.sale_price) * quantity;
+    }, 0);
+    const tableSale = {
+      days,
+      hours: 2 + (index % 7),
+      cashier_id: cashierA,
+      cash_session_id: null,
+      sale_type: 'table',
+      products_total: money(firstProductsTotal),
+      game_total: 22 + (index % 6) * 8,
+      payment_method: ['cash', 'qr', 'card'][index % 3],
+      table_name: `Mesa ${tableNumber}`,
+      items: firstProducts,
+    };
+
+    const secondProduct = ((index + 4) % 6) + 1;
+    const secondQty = (index % 2) + 1;
+    const secondPrice = products.find(item => item.id === secondProduct)?.sale_price || 0;
+    const posSale = {
+      days,
+      hours: 5 + (index % 6),
+      cashier_id: cashierB,
+      cash_session_id: null,
+      sale_type: 'pos',
+      products_total: money(secondPrice * secondQty),
+      game_total: 0,
+      payment_method: ['qr', 'cash', 'card'][index % 3],
+      items: [[secondProduct, secondQty]],
+    };
+
+    return index % 3 === 1 ? [tableSale] : [tableSale, posSale];
+  });
+
+  const allSaleSeed = [...saleSeed, ...historicalSaleSeed];
+
+  const sales = allSaleSeed.map((seed, index) => {
     const id = index + 1;
     const items = seed.items.map(([productId, quantity], itemIndex) => {
       const product = products.find(p => p.id === productId);
@@ -240,7 +289,7 @@ function initialState() {
   }));
 
   return {
-    version: 6,
+    version: 7,
     users,
     categories,
     products,
@@ -270,7 +319,7 @@ function loadState() {
     const raw = localStorage.getItem(STATE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
-      if (parsed?.version === 6) return parsed;
+      if (parsed?.version === 7) return parsed;
     }
   } catch {}
   const fresh = initialState();
@@ -584,46 +633,182 @@ function ownerControl(state) {
   };
 }
 
-function reports(state, from, to) {
-  const filtered = state.sales.filter(sale => sale.status === 'completed' && dateOnly(sale.created_at) >= from && dateOnly(sale.created_at) <= to);
+function reportTimestamp(value, fallback) {
+  if (!value) return fallback;
+  const parsed = new Date(String(value).replace(' ', 'T')).getTime();
+  return Number.isNaN(parsed) ? fallback : parsed;
+}
+
+function reports(state, fromAt, toAt) {
+  const startMs = reportTimestamp(fromAt, 0);
+  const endMs = reportTimestamp(toAt, Number.MAX_SAFE_INTEGER);
+  const filtered = state.sales
+    .filter(sale => {
+      if (sale.status !== 'completed') return false;
+      const created = reportTimestamp(sale.created_at, 0);
+      return created >= startMs && created <= endMs;
+    })
+    .sort((a, b) => reportTimestamp(b.created_at, 0) - reportTimestamp(a.created_at, 0));
+
   const dayMap = new Map();
-  filtered.forEach(sale => {
-    const day = dateOnly(sale.created_at);
-    const row = dayMap.get(day) || { day, sales_count: 0, total: 0, products_total: 0, game_total: 0 };
-    row.sales_count += 1;
-    row.total = money(row.total + n(sale.total));
-    row.products_total = money(row.products_total + n(sale.products_total));
-    row.game_total = money(row.game_total + n(sale.game_total));
-    dayMap.set(day, row);
-  });
-
   const cashierMap = new Map();
-  filtered.forEach(sale => {
-    const user = state.users.find(item => item.id === sale.cashier_id);
-    const key = user?.name || 'Cajero';
-    const row = cashierMap.get(key) || { cashier_name: key, sales_count: 0, total: 0 };
-    row.sales_count += 1;
-    row.total = money(row.total + n(sale.total));
-    cashierMap.set(key, row);
-  });
-
   const productMap = new Map();
+  const paymentMap = new Map();
+  const tableMap = new Map();
+
   filtered.forEach(sale => {
+    const total = n(sale.total);
+    const productsTotal = n(sale.products_total);
+    const gameTotal = n(sale.game_total);
+    const day = dateOnly(sale.created_at);
+
+    const dayRow = dayMap.get(day) || {
+      day,
+      weekday: new Date(`${day}T12:00:00`).getDay(),
+      sales_count: 0,
+      total: 0,
+      products_total: 0,
+      game_total: 0,
+      average_ticket: 0,
+    };
+    dayRow.sales_count += 1;
+    dayRow.total = money(dayRow.total + total);
+    dayRow.products_total = money(dayRow.products_total + productsTotal);
+    dayRow.game_total = money(dayRow.game_total + gameTotal);
+    dayRow.average_ticket = money(dayRow.total / dayRow.sales_count);
+    dayMap.set(day, dayRow);
+
+    const user = state.users.find(item => item.id === sale.cashier_id);
+    const cashierName = user?.name || 'Cajero';
+    const cashierRow = cashierMap.get(sale.cashier_id) || {
+      cashier_id: sale.cashier_id,
+      cashier_name: cashierName,
+      role: user?.role || 'cashier',
+      role_label: user?.role_label || 'Cajero',
+      sales_count: 0,
+      total: 0,
+      products_total: 0,
+      game_total: 0,
+      average_ticket: 0,
+      table_sales: 0,
+      pos_sales: 0,
+    };
+    cashierRow.sales_count += 1;
+    cashierRow.total = money(cashierRow.total + total);
+    cashierRow.products_total = money(cashierRow.products_total + productsTotal);
+    cashierRow.game_total = money(cashierRow.game_total + gameTotal);
+    cashierRow.average_ticket = money(cashierRow.total / cashierRow.sales_count);
+    if (sale.sale_type === 'table') cashierRow.table_sales += 1;
+    else cashierRow.pos_sales += 1;
+    cashierMap.set(sale.cashier_id, cashierRow);
+
     saleItemsWithNames(state, sale).forEach(item => {
       const key = item.product_name;
-      const row = productMap.get(key) || { product_name: key, quantity: 0, total: 0 };
-      row.quantity = money(row.quantity + n(item.quantity));
-      row.total = money(row.total + n(item.line_total));
-      productMap.set(key, row);
+      const product = state.products.find(productRow => productRow.id === item.product_id);
+      const category = state.categories.find(categoryRow => categoryRow.id === product?.category_id);
+      const productRow = productMap.get(key) || {
+        product_name: key,
+        category_id: product?.category_id || null,
+        category_name: category?.name || 'Sin categoría',
+        quantity: 0,
+        total: 0,
+        transactions: 0,
+      };
+      productRow.quantity = money(productRow.quantity + n(item.quantity));
+      productRow.total = money(productRow.total + n(item.line_total));
+      productRow.transactions += 1;
+      productMap.set(key, productRow);
     });
+
+    const paymentKey = sale.payment_method || 'other';
+    const paymentRow = paymentMap.get(paymentKey) || {
+      payment_method: paymentKey,
+      sales_count: 0,
+      total: 0,
+      percentage: 0,
+    };
+    paymentRow.sales_count += 1;
+    paymentRow.total = money(paymentRow.total + total);
+    paymentMap.set(paymentKey, paymentRow);
+
+    if (sale.sale_type === 'table' && sale.table_name) {
+      const tableConfig = state.tables.find(item => item.name === sale.table_name);
+      const tableRow = tableMap.get(sale.table_name) || {
+        table_name: sale.table_name,
+        table_type: tableConfig?.table_type || 'billiard',
+        sessions: 0,
+        total: 0,
+        products_total: 0,
+        game_total: 0,
+        average_ticket: 0,
+      };
+      tableRow.sessions += 1;
+      tableRow.total = money(tableRow.total + total);
+      tableRow.products_total = money(tableRow.products_total + productsTotal);
+      tableRow.game_total = money(tableRow.game_total + gameTotal);
+      tableRow.average_ticket = money(tableRow.total / tableRow.sessions);
+      tableMap.set(sale.table_name, tableRow);
+    }
   });
 
+  const total = money(filtered.reduce((sum, sale) => sum + n(sale.total), 0));
+  const productsTotal = money(filtered.reduce((sum, sale) => sum + n(sale.products_total), 0));
+  const gameTotal = money(filtered.reduce((sum, sale) => sum + n(sale.game_total), 0));
+  const cashiers = [...cashierMap.values()].sort((a, b) => b.total - a.total);
+  const products = [...productMap.values()].sort((a, b) => b.total - a.total);
+  const daily = [...dayMap.values()].sort((a, b) => a.day.localeCompare(b.day));
+  const payments = [...paymentMap.values()].sort((a, b) => b.total - a.total).map(item => ({
+    ...item,
+    percentage: total ? money((n(item.total) / total) * 100) : 0,
+  }));
+  const tables = [...tableMap.values()].sort((a, b) => b.total - a.total);
+
+  const sales = filtered.map(sale => {
+    const user = state.users.find(item => item.id === sale.cashier_id);
+    const items = saleItemsWithNames(state, sale);
+    return {
+      id: sale.id,
+      sale_number: sale.sale_number,
+      created_at: sale.created_at,
+      cashier_id: sale.cashier_id,
+      cashier_name: user?.name || 'Cajero',
+      sale_type: sale.sale_type,
+      table_name: sale.table_name || null,
+      payment_method: sale.payment_method || 'other',
+      products_total: money(sale.products_total),
+      game_total: money(sale.game_total),
+      total: money(sale.total),
+      product_units: items.reduce((sum, item) => sum + n(item.quantity), 0),
+    };
+  });
+
+  const topSeller = cashiers[0] || null;
+  const topProduct = products[0] || null;
+  const bestDay = daily.slice().sort((a, b) => b.total - a.total)[0] || null;
+  const topPayment = payments[0] || null;
+
   return {
-    from,
-    to,
-    daily: [...dayMap.values()].sort((a, b) => a.day.localeCompare(b.day)),
-    cashiers: [...cashierMap.values()].sort((a, b) => b.total - a.total),
-    products: [...productMap.values()].sort((a, b) => b.total - a.total).slice(0, 20),
+    from_at: fromAt,
+    to_at: toAt,
+    summary: {
+      total,
+      sales_count: filtered.length,
+      products_total: productsTotal,
+      game_total: gameTotal,
+      average_ticket: filtered.length ? money(total / filtered.length) : 0,
+      table_sales: filtered.filter(item => item.sale_type === 'table').length,
+      pos_sales: filtered.filter(item => item.sale_type !== 'table').length,
+      top_seller: topSeller,
+      top_product: topProduct,
+      best_day: bestDay,
+      top_payment: topPayment,
+    },
+    daily,
+    cashiers,
+    products,
+    payments,
+    tables,
+    sales,
   };
 }
 
@@ -1102,17 +1287,27 @@ export async function demoApi(path, options = {}) {
 
   if (method === 'GET' && pathname === '/reports/daily') {
     requireAdmin(state);
-    const from = url.searchParams.get('from') || `${dateOnly().slice(0, 8)}01`;
-    const to = url.searchParams.get('to') || dateOnly();
-    return reports(state, from, to);
+    const fromDate = url.searchParams.get('from') || `${dateOnly().slice(0, 8)}01`;
+    const toDate = url.searchParams.get('to') || dateOnly();
+    const fromAt = url.searchParams.get('from_at') || `${fromDate}T00:00:00`;
+    const toAt = url.searchParams.get('to_at') || `${toDate}T23:59:59`;
+    return reports(state, fromAt, toAt);
   }
 
   if (method === 'GET' && pathname === '/reports/audit') {
     requireAdmin(state);
+    const fromAt = url.searchParams.get('from_at');
+    const toAt = url.searchParams.get('to_at');
+    const startMs = reportTimestamp(fromAt, 0);
+    const endMs = reportTimestamp(toAt, Number.MAX_SAFE_INTEGER);
     const logs = state.auditLogs
+      .filter(item => {
+        const created = reportTimestamp(item.created_at, 0);
+        return created >= startMs && created <= endMs;
+      })
       .slice()
-      .sort((a, b) => b.id - a.id)
-      .slice(0, 150)
+      .sort((a, b) => reportTimestamp(b.created_at, 0) - reportTimestamp(a.created_at, 0))
+      .slice(0, 500)
       .map(item => ({ ...clone(item), user_name: state.users.find(userRow => userRow.id === item.user_id)?.name || null }));
     return { logs };
   }
