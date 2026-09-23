@@ -7,14 +7,14 @@ Esta versión existe únicamente para mostrar el flujo completo al cliente mient
 ## Credenciales demo
 
 **Administrador**
-- Usuario: `admin`
-- Contraseña: `admin123`
+- Usuario: 
+- Contraseña: 
 
 **Cajero**
-- Usuario: `caja`
-- Contraseña: `caja123`
+- Usuario: 
+- Contraseña: 
 
-También existe un cajero adicional `maria / demo123`.
+También existe un cajero adicional 
 
 ## Funciones activas en la demo
 
